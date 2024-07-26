@@ -22,9 +22,14 @@ REPO_OWNER = "hutlaw"  # Replace with your GitHub username
 REPO_NAME = "discordBot"  # Replace with your GitHub repository name
 GITHUB_FILE_PATH = "pfp.png"  # File path in the repository
 
+# Additional repository details
+WEBSITE_REPO_NAME = "hutlaw.github.io"
+WEBSITE_FILE_PATH = "pfp.png"  # Path in the additional repository
+
 # Create an instance of the bot with necessary intents
 intents = discord.Intents.default()
 intents.members = True  # Enable the members intent
+
 
 class DiscordBot(discord.Client):
     def __init__(self, intents):
@@ -53,11 +58,11 @@ class DiscordBot(discord.Client):
                 return
 
             print(f'Found channel: {channel.name}')
-            
+
             # Get user's profile picture URL
             avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
             print(f'User avatar URL: {avatar_url}')
-            
+
             # Download the profile picture
             async with aiohttp.ClientSession() as session:
                 async with session.get(avatar_url) as response:
@@ -65,15 +70,21 @@ class DiscordBot(discord.Client):
                         file_path = 'pfp.png'
                         with open(file_path, 'wb') as f:
                             f.write(await response.read())
-                        
+
                         print('Profile picture downloaded')
-                        
+
                         # Send the profile picture to the channel and ping the user
                         await channel.send(content=f'<@{USER_ID}>', file=discord.File(file_path))
                         print('Profile picture sent to channel')
 
                         # Upload the profile picture to GitHub
-                        await self.upload_to_github(file_path)
+                        await self.upload_to_github(file_path, GITHUB_FILE_PATH)
+
+                        # Upload to the second repository
+                        await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
+
+                        # Update GitHub profile picture
+                        await self.update_github_profile_picture(file_path)
 
                         # Clean up the file after sending
                         os.remove(file_path)
@@ -90,11 +101,11 @@ class DiscordBot(discord.Client):
         finally:
             await self.close()
 
-    async def upload_to_github(self, file_path):
-        """Upload a file to the GitHub repository."""
+    async def upload_to_github(self, file_path, file_path_in_repo, repo_name=None):
+        """Upload a file to a specified GitHub repository."""
         try:
-            # Construct the URL to access the repository
-            url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{GITHUB_FILE_PATH}"
+            repo_name = repo_name or REPO_NAME  # Default to the main repo if none is specified
+            url = f"https://api.github.com/repos/{REPO_OWNER}/{repo_name}/contents/{file_path_in_repo}"
             headers = {
                 "Authorization": f"Bearer {GITHUB_TOKEN}",
                 "Accept": "application/vnd.github+json"
@@ -118,7 +129,7 @@ class DiscordBot(discord.Client):
 
             # Prepare the data payload
             data = {
-                "message": "Update pfp.png",
+                "message": f"Update {file_path_in_repo}",
                 "committer": {
                     "name": "Your Name",  # Replace with your GitHub username
                     "email": "your-email@example.com"  # Replace with your GitHub email
@@ -135,12 +146,41 @@ class DiscordBot(discord.Client):
             response = requests.put(url, headers=headers, data=json.dumps(data))
 
             if response.status_code in [200, 201]:
-                print('Profile picture uploaded to GitHub successfully.')
+                print(f'Profile picture uploaded to {repo_name} successfully.')
             else:
-                print(f'Failed to upload to GitHub: {response.status_code} {response.content}')
+                print(f'Failed to upload to {repo_name}: {response.status_code} {response.content}')
 
         except Exception as e:
-            print(f'Error uploading to GitHub: {e}')
+            print(f'Error uploading to {repo_name}: {e}')
+
+    async def update_github_profile_picture(self, file_path):
+        """Update GitHub profile picture using the uploaded image."""
+        try:
+            url = "https://api.github.com/user"
+            headers = {
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json"
+            }
+
+            # Read the image file to bytes
+            with open(file_path, "rb") as file:
+                image_data = file.read()
+
+            # Prepare data for profile picture update
+            data = {
+                "avatar_url": b64encode(image_data).decode("utf-8")
+            }
+
+            # Send PATCH request to update GitHub profile picture
+            response = requests.patch(url, headers=headers, data=json.dumps(data))
+
+            if response.status_code == 200:
+                print('GitHub profile picture updated successfully.')
+            else:
+                print(f'Failed to update GitHub profile picture: {response.status_code} {response.content}')
+
+        except Exception as e:
+            print(f'Error updating GitHub profile picture: {e}')
 
     async def setup_hook(self):
         # Run any asynchronous initialization here
