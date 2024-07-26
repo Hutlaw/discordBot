@@ -17,10 +17,10 @@ USER_ID = 849456491131043840
 
 REPO_OWNER = "hutlaw"
 REPO_NAME = "discordBot"
-GITHUB_FILE_PATH = "images/pfp.png"  # Update to images folder
+GITHUB_FILE_PATH = "pfp.png"
 
 WEBSITE_REPO_NAME = "hutlaw.github.io"
-WEBSITE_FILE_PATH = "images/pfp.png"  # Update to images folder
+WEBSITE_FILE_PATH = "images/pfp.png"
 
 intents = discord.Intents.default()
 intents.members = True
@@ -70,7 +70,6 @@ class DiscordBot(discord.Client):
 
                         await self.upload_to_github(file_path, GITHUB_FILE_PATH)
                         await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
-                        await self.update_github_profile_picture(file_path)
 
                         os.remove(file_path)
                     else:
@@ -129,31 +128,6 @@ class DiscordBot(discord.Client):
 
         except Exception as e:
             print(f'Error uploading to {repo_name}: {e}')
-
-    async def update_github_profile_picture(self, file_path):
-        try:
-            url = "https://api.github.com/user"
-            headers = {
-                "Authorization": f"Bearer {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github+json"
-            }
-
-            with open(file_path, "rb") as file:
-                image_data = file.read()
-
-            data = {
-                "avatar_url": b64encode(image_data).decode("utf-8")
-            }
-
-            response = requests.patch(url, headers=headers, data=json.dumps(data))
-
-            if response.status_code == 200:
-                print('GitHub profile picture updated successfully.')
-            else:
-                print(f'Failed to update GitHub profile picture: {response.status_code} {response.content}')
-
-        except Exception as e:
-            print(f'Error updating GitHub profile picture: {e}')
 
     async def setup_hook(self):
         self.bg_task = self.loop.create_task(self.timeout_bot())
