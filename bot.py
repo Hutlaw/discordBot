@@ -7,6 +7,7 @@ import asyncio
 import requests
 from base64 import b64encode
 import json
+from discord.ext import tasks
 
 # Retrieve the bot token and GitHub token from environment variables (GitHub secrets)
 DISCORD_TOKEN = os.getenv('DToken')
@@ -20,20 +21,20 @@ USER_ID = 849456491131043840
 # Define your GitHub repository details
 REPO_OWNER = "hutlaw"  # Replace with your GitHub username
 REPO_NAME = "discordBot"  # Replace with your GitHub repository name
-GITHUB_FILE_PATH = "pfp.png"  # File path in the repository
+GITHUB_FILE_PATH = "pfp.png"  # File path in the main repository
 
-# Additional repository details
+# Additional repository details for uploading the image
 WEBSITE_REPO_NAME = "hutlaw.github.io"
-WEBSITE_FILE_PATH = "pfp.png"  # Path in the additional repository
+WEBSITE_FILE_PATH = "images/pfp.png"  # Path in the images folder of the additional repository
 
 # Create an instance of the bot with necessary intents
 intents = discord.Intents.default()
 intents.members = True  # Enable the members intent
 
-
 class DiscordBot(discord.Client):
     def __init__(self, intents):
         super().__init__(intents=intents)
+        self.profile_picture_task.start()  # Start the scheduled task
 
     async def on_ready(self):
         print(f'Logged in as {self.user.name}')
@@ -63,7 +64,15 @@ class DiscordBot(discord.Client):
             avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
             print(f'User avatar URL: {avatar_url}')
 
-            # Download the profile picture
+            # Download and update profile picture
+            await self.update_profile_picture(channel, avatar_url)
+
+        except Exception as e:
+            print(f'Error: {e}')
+
+    async def update_profile_picture(self, channel, avatar_url):
+        """Download and update the profile picture."""
+        try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(avatar_url) as response:
                     if response.status == 200:
@@ -73,14 +82,14 @@ class DiscordBot(discord.Client):
 
                         print('Profile picture downloaded')
 
-                        # Send the profile picture to the channel and ping the user
-                        await channel.send(content=f'<@{USER_ID}>', file=discord.File(file_path))
-                        print('Profile picture sent to channel')
+                        # Send the profile picture update message
+                        await channel.send(content="Profile picture updated")
+                        print('Profile picture update message sent to channel')
 
                         # Upload the profile picture to GitHub
                         await self.upload_to_github(file_path, GITHUB_FILE_PATH)
 
-                        # Upload to the second repository
+                        # Upload to the second repository's images folder
                         await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
 
                         # Update GitHub profile picture
@@ -90,16 +99,13 @@ class DiscordBot(discord.Client):
                         os.remove(file_path)
                     else:
                         await channel.send(
-                            content=f'<@{USER_ID}>',
+                            content="Failed to retrieve profile picture.",
                             embed=discord.Embed(description="Failed to retrieve profile picture.")
                         )
                         print('Failed to retrieve profile picture')
 
         except Exception as e:
-            print(f'Error: {e}')
-
-        finally:
-            await self.close()
+            print(f'Error in update_profile_picture: {e}')
 
     async def upload_to_github(self, file_path, file_path_in_repo, repo_name=None):
         """Upload a file to a specified GitHub repository."""
@@ -166,13 +172,13 @@ class DiscordBot(discord.Client):
             with open(file_path, "rb") as file:
                 image_data = file.read()
 
-            # Prepare data for profile picture update
-            data = {
-                "avatar_url": b64encode(image_data).decode("utf-8")
-            }
-
-            # Send PATCH request to update GitHub profile picture
-            response = requests.patch(url, headers=headers, data=json.dumps(data))
+            # Prepare the headers and payload for uploading
+            headers["Content-Type"] = "image/png"  # Add content type
+            response = requests.post(
+                url,
+                headers=headers,
+                files={"avatar": ("pfp.png", image_data, "image/png")}
+            )
 
             if response.status_code == 200:
                 print('GitHub profile picture updated successfully.')
@@ -182,15 +188,30 @@ class DiscordBot(discord.Client):
         except Exception as e:
             print(f'Error updating GitHub profile picture: {e}')
 
-    async def setup_hook(self):
-        # Run any asynchronous initialization here
-        self.bg_task = self.loop.create_task(self.timeout_bot())
+    @tasks.loop(hours=1)
+    async def profile_picture_task(self):
+        """Task to update profile picture every hour."""
+        try:
+            guild = self.get_guild(SERVER_ID)
+            if guild is None:
+                print(f"Error: Guild with ID {SERVER_ID} not found.")
+                return
 
-    async def timeout_bot(self):
-        await asyncio.sleep(60)
-        if not self.is_closed():
-            print('Timeout reached, closing bot')
-            await self.close()
+            user = guild.get_member(USER_ID)
+            if user is None:
+                print(f"Error: User with ID {USER_ID} not found in guild.")
+                return
+
+            channel = guild.get_channel(CHANNEL_ID)
+            if channel is None:
+                print(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
+                return
+
+            avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
+            print(f'Updating avatar for {user.name} with URL: {avatar_url}')
+            await self.update_profile_picture(channel, avatar_url)
+        except Exception as e:
+            print(f'Error in profile_picture_task: {e}')
 
 async def main():
     bot = DiscordBot(intents=intents)
