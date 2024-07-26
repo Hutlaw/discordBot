@@ -8,7 +8,7 @@ import requests
 from base64 import b64encode
 import json
 
-# Retrieve the bot token from environment variables (GitHub secrets)
+# Retrieve the bot token and GitHub token from environment variables (GitHub secrets)
 DISCORD_TOKEN = os.getenv('DToken')
 GITHUB_TOKEN = os.getenv('GToken')
 
@@ -17,9 +17,10 @@ SERVER_ID = 1143308869817356428
 CHANNEL_ID = 1266202982182162482
 USER_ID = 849456491131043840
 
-# GitHub repository details
-GITHUB_REPO = "hutlaw/discordBot"  # Replace with your repo
-GITHUB_FILE_PATH = "pfp.png"  # File path in the repo
+# Define your GitHub repository details
+REPO_OWNER = "hutlaw"  # Replace with your GitHub username
+REPO_NAME = "discordBot"  # Replace with your GitHub repository name
+GITHUB_FILE_PATH = "pfp.png"  # File path in the repository
 
 # Create an instance of the bot with necessary intents
 intents = discord.Intents.default()
@@ -92,8 +93,8 @@ class DiscordBot(discord.Client):
     async def upload_to_github(self, file_path):
         """Upload a file to the GitHub repository."""
         try:
-            # Step 1: Get the SHA of the existing file (if it exists) for updating
-            url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE_PATH}"
+            # Construct the URL to access the repository
+            url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{GITHUB_FILE_PATH}"
             headers = {
                 "Authorization": f"Bearer {GITHUB_TOKEN}",
                 "Accept": "application/vnd.github+json"
@@ -111,10 +112,11 @@ class DiscordBot(discord.Client):
                 # File does not exist, will create a new one
                 print('No existing file found. A new file will be created.')
 
-            # Step 2: Upload the new file to the repository
+            # Prepare the content to be uploaded
             with open(file_path, "rb") as file:
                 content = b64encode(file.read()).decode("utf-8")
 
+            # Prepare the data payload
             data = {
                 "message": "Update pfp.png",
                 "committer": {
@@ -122,7 +124,7 @@ class DiscordBot(discord.Client):
                     "email": "your-email@example.com"  # Replace with your GitHub email
                 },
                 "content": content,
-                "branch": "main"
+                "branch": "main"  # Replace with your target branch name
             }
 
             if sha:
