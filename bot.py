@@ -1,5 +1,6 @@
 import discord
 import os
+import aiohttp
 
 # Retrieve the bot token from environment variables (GitHub secrets)
 TOKEN = os.getenv('DToken')
@@ -23,14 +24,17 @@ async def on_ready():
             channel = guild.get_channel(CHANNEL_ID)
             if channel:
                 # Get user's profile picture URL
-                avatar_url = user.avatar.url
+                avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
                 # Download the profile picture
-                async with bot.http._session.get(avatar_url) as response:
-                    if response.status == 200:
-                        with open('profile_picture.png', 'wb') as f:
-                            f.write(await response.read())
-                # Send the profile picture to the channel and ping the user
-                await channel.send(content=f'<@{USER_ID}>', file=discord.File('profile_picture.png'))
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(avatar_url) as response:
+                        if response.status == 200:
+                            with open('profile_picture.png', 'wb') as f:
+                                f.write(await response.read())
+                            # Send the profile picture to the channel and ping the user
+                            await channel.send(content=f'<@{USER_ID}>', file=discord.File('profile_picture.png'))
+                        else:
+                            await channel.send(content=f'<@{USER_ID}>', embed=discord.Embed(description="Failed to retrieve profile picture."))
                 await bot.close()
 
 bot.run(TOKEN)
