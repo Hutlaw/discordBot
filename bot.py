@@ -18,8 +18,8 @@ CHANNEL_ID = 1266202982182162482
 USER_ID = 849456491131043840
 
 # GitHub repository details
-GITHUB_REPO = "your-username/your-repository"  # Replace with your GitHub repository
-GITHUB_FILE_PATH = "pfp.png"  # File path in the repository
+GITHUB_REPO = "hutlaw/discordBot"  # Replace with your repo
+GITHUB_FILE_PATH = "pfp.png"  # File path in the repo
 
 # Create an instance of the bot with necessary intents
 intents = discord.Intents.default()
@@ -96,7 +96,7 @@ class DiscordBot(discord.Client):
             url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE_PATH}"
             headers = {
                 "Authorization": f"Bearer {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github.v3+json"
+                "Accept": "application/vnd.github+json"
             }
 
             # Try to get the SHA of the existing file
