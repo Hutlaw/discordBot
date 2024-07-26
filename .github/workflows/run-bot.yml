@@ -2,7 +2,9 @@
 
 name: Run Discord Bot
 
-on: 
+on:
+  schedule:
+    - cron: '0 * * * *'  # Run every hour
   workflow_dispatch:
 
 jobs:
