@@ -15,7 +15,6 @@ USER_ID = 849456491131043840
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 
-@bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
     try:
@@ -49,12 +48,13 @@ async def on_ready():
         print(f'Error: {e}')
         await bot.close()
 
-# Set a timeout to ensure the bot doesn't hang indefinitely
-async def timeout_bot():
-    await asyncio.sleep(60)
-    if not bot.is_closed():
-        print('Timeout reached, closing bot')
-        await bot.close()
+async def main():
+    async with bot:
+        bot.event(on_ready)
+        await asyncio.sleep(60)  # Wait for 60 seconds before closing the bot
+        if not bot.is_closed():
+            print('Timeout reached, closing bot')
+            await bot.close()
 
-bot.loop.create_task(timeout_bot())
-bot.run(TOKEN)
+if __name__ == "__main__":
+    asyncio.run(main())
