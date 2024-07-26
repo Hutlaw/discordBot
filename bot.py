@@ -18,9 +18,19 @@ async def on_ready():
     print(f'Logged in as {bot.user.name}')
     guild = bot.get_guild(SERVER_ID)
     if guild:
-        channel = guild.get_channel(CHANNEL_ID)
-        if channel:
-            await channel.send(f'<@{USER_ID}>')
-            await bot.close()
+        user = guild.get_member(USER_ID)
+        if user:
+            channel = guild.get_channel(CHANNEL_ID)
+            if channel:
+                # Get user's profile picture URL
+                avatar_url = user.avatar.url
+                # Download the profile picture
+                async with bot.http._session.get(avatar_url) as response:
+                    if response.status == 200:
+                        with open('profile_picture.png', 'wb') as f:
+                            f.write(await response.read())
+                # Send the profile picture to the channel and ping the user
+                await channel.send(content=f'<@{USER_ID}>', file=discord.File('profile_picture.png'))
+                await bot.close()
 
 bot.run(TOKEN)
