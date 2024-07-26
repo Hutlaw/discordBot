@@ -22,23 +22,25 @@ bot = discord.Client(intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name}')
-
     try:
         guild = bot.get_guild(SERVER_ID)
         if guild is None:
-            raise ValueError(f"Guild with ID {SERVER_ID} not found.")
+            print(f"Error: Guild with ID {SERVER_ID} not found.")
+            return
 
         print(f'Found guild: {guild.name}')
         user = guild.get_member(USER_ID)
 
         if user is None:
-            raise ValueError(f"User with ID {USER_ID} not found in guild.")
+            print(f"Error: User with ID {USER_ID} not found in guild.")
+            return
 
         print(f'Found user: {user.name}')
         channel = guild.get_channel(CHANNEL_ID)
 
         if channel is None:
-            raise ValueError(f"Channel with ID {CHANNEL_ID} not found in guild.")
+            print(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
+            return
 
         print(f'Found channel: {channel.name}')
         
