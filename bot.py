@@ -18,8 +18,8 @@ CHANNEL_ID = 1266202982182162482
 USER_ID = 849456491131043840
 
 # GitHub repository details
-GITHUB_REPO = "your-username/your-repository"  # Replace with your repo
-GITHUB_FILE_PATH = "pfp.png"  # File path in the repo
+GITHUB_REPO = "your-username/your-repository"  # Replace with your GitHub repository
+GITHUB_FILE_PATH = "pfp.png"  # File path in the repository
 
 # Create an instance of the bot with necessary intents
 intents = discord.Intents.default()
@@ -92,21 +92,24 @@ class DiscordBot(discord.Client):
     async def upload_to_github(self, file_path):
         """Upload a file to the GitHub repository."""
         try:
-            # Step 1: Get the SHA of the existing file (if it exists) for deletion
+            # Step 1: Get the SHA of the existing file (if it exists) for updating
             url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE_PATH}"
             headers = {
                 "Authorization": f"Bearer {GITHUB_TOKEN}",
                 "Accept": "application/vnd.github.v3+json"
             }
 
+            # Try to get the SHA of the existing file
             response = requests.get(url, headers=headers)
             sha = None
 
             if response.status_code == 200:
+                # File exists, get the SHA
                 sha = response.json().get('sha')
                 print(f'Existing file SHA: {sha}')
             elif response.status_code == 404:
-                print('No existing file to delete.')
+                # File does not exist, will create a new one
+                print('No existing file found. A new file will be created.')
 
             # Step 2: Upload the new file to the repository
             with open(file_path, "rb") as file:
@@ -123,8 +126,10 @@ class DiscordBot(discord.Client):
             }
 
             if sha:
-                data["sha"] = sha  # Include SHA if replacing an existing file
+                # Include SHA if replacing an existing file
+                data["sha"] = sha
 
+            # Send the request to upload the file
             response = requests.put(url, headers=headers, data=json.dumps(data))
 
             if response.status_code in [200, 201]:
