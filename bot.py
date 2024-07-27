@@ -7,9 +7,14 @@ import asyncio
 import requests
 from base64 import b64encode
 import json
+from requests_oauthlib import OAuth1Session
 
-DISCORD_TOKEN = os.getenv('DToken')
-GITHUB_TOKEN = os.getenv('GToken')
+DISCORD_TOKEN = os.getenv('DTOKEN')
+GITHUB_TOKEN = os.getenv('GTOKEN')
+TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
+TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
+TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CLIENT_ID')
+TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CLIENT_SECRET')
 
 SERVER_ID = 1143308869817356428
 CHANNEL_ID = 1266202982182162482
@@ -70,6 +75,7 @@ class DiscordBot(discord.Client):
 
                         await self.upload_to_github(file_path, GITHUB_FILE_PATH)
                         await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
+                        await self.upload_to_twitter(file_path)
 
                         os.remove(file_path)
                     else:
@@ -128,6 +134,36 @@ class DiscordBot(discord.Client):
 
         except Exception as e:
             print(f'Error uploading to {repo_name}: {e}')
+
+    async def upload_to_twitter(self, file_path):
+        try:
+            twitter = OAuth1Session(
+                TWITTER_CONSUMER_KEY,
+                TWITTER_CONSUMER_SECRET,
+                TWITTER_ACCESS_TOKEN,
+                TWITTER_ACCESS_TOKEN_SECRET
+            )
+
+            with open(file_path, "rb") as image_file:
+                image_data = image_file.read()
+
+            media_upload_url = "https://upload.twitter.com/1.1/media/upload.json"
+            response = twitter.post(media_upload_url, files={"media": image_data})
+
+            if response.status_code == 200:
+                media_id = response.json()["media_id_string"]
+                update_profile_image_url = "https://api.twitter.com/1.1/account/update_profile_image.json"
+                response = twitter.post(update_profile_image_url, params={"media_id": media_id})
+
+                if response.status_code == 200:
+                    print('Profile picture updated on Twitter successfully.')
+                else:
+                    print(f'Failed to update Twitter profile picture: {response.status_code} {response.text}')
+            else:
+                print(f'Failed to upload media to Twitter: {response.status_code} {response.text}')
+
+        except Exception as e:
+            print(f'Error updating Twitter profile picture: {e}')
 
     async def setup_hook(self):
         self.bg_task = self.loop.create_task(self.timeout_bot())
