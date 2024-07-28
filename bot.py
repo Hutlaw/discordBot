@@ -6,6 +6,12 @@ import requests
 from base64 import b64encode
 import json
 from requests_oauthlib import OAuth1Session
+import logging
+import io
+
+# Initialize logging
+log_stream = io.StringIO()
+logging.basicConfig(stream=log_stream, level=logging.INFO)
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
 GITHUB_TOKEN = os.getenv('GTOKEN')
@@ -33,31 +39,31 @@ class DiscordBot(discord.Client):
         super().__init__(intents=intents)
 
     async def on_ready(self):
-        print(f'Logged in as {self.user.name}')
+        logging.info(f'Logged in as {self.user.name}')
         try:
             guild = self.get_guild(SERVER_ID)
             if guild is None:
-                print(f"Error: Guild with ID {SERVER_ID} not found.")
+                logging.error(f"Error: Guild with ID {SERVER_ID} not found.")
                 return
 
-            print(f'Found guild: {guild.name}')
+            logging.info(f'Found guild: {guild.name}')
             user = guild.get_member(USER_ID)
 
             if user is None:
-                print(f"Error: User with ID {USER_ID} not found in guild.")
+                logging.error(f"Error: User with ID {USER_ID} not found in guild.")
                 return
 
-            print(f'Found user: {user.name}')
+            logging.info(f'Found user: {user.name}')
             channel = guild.get_channel(CHANNEL_ID)
 
             if channel is None:
-                print(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
+                logging.error(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
                 return
 
-            print(f'Found channel: {channel.name}')
+            logging.info(f'Found channel: {channel.name}')
 
             avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
-            print(f'User avatar URL: {avatar_url}')
+            logging.info(f'User avatar URL: {avatar_url}')
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(avatar_url) as response:
@@ -66,10 +72,7 @@ class DiscordBot(discord.Client):
                         with open(file_path, 'wb') as f:
                             f.write(await response.read())
 
-                        print('Profile picture downloaded')
-
-                        await channel.send(content='Profile picture updated', file=discord.File(file_path))
-                        print('Profile picture sent to channel')
+                        logging.info('Profile picture downloaded')
 
                         await self.upload_to_github(file_path, GITHUB_FILE_PATH)
                         await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
@@ -77,17 +80,23 @@ class DiscordBot(discord.Client):
 
                         os.remove(file_path)
                     else:
-                        await channel.send(
-                            content='Failed to retrieve profile picture.',
-                            embed=discord.Embed(description="Failed to retrieve profile picture.")
-                        )
-                        print('Failed to retrieve profile picture')
+                        logging.error('Failed to retrieve profile picture')
 
         except Exception as e:
-            print(f'Error: {e}')
+            logging.error(f'Error: {e}')
 
         finally:
+            log_contents = log_stream.getvalue()
+            await self.send_logs_to_channel(channel, log_contents)
             await self.close()
+
+    async def send_logs_to_channel(self, channel, log_contents):
+        max_message_length = 2000
+        if len(log_contents) > max_message_length:
+            for i in range(0, len(log_contents), max_message_length):
+                await channel.send(f"```\n{log_contents[i:i + max_message_length]}\n```")
+        else:
+            await channel.send(f"```\n{log_contents}\n```")
 
     async def upload_to_github(self, file_path, file_path_in_repo, repo_name=None):
         try:
@@ -103,9 +112,9 @@ class DiscordBot(discord.Client):
 
             if response.status_code == 200:
                 sha = response.json().get('sha')
-                print(f'Existing file SHA: {sha}')
+                logging.info(f'Existing file SHA: {sha}')
             elif response.status_code == 404:
-                print('No existing file found. A new file will be created.')
+                logging.info('No existing file found. A new file will be created.')
 
             with open(file_path, "rb") as file:
                 content = b64encode(file.read()).decode("utf-8")
@@ -126,12 +135,12 @@ class DiscordBot(discord.Client):
             response = requests.put(url, headers=headers, data=json.dumps(data))
 
             if response.status_code in [200, 201]:
-                print(f'Profile picture uploaded to {repo_name} successfully.')
+                logging.info(f'Profile picture uploaded to {repo_name} successfully.')
             else:
-                print(f'Failed to upload to {repo_name}: {response.status_code} {response.content}')
+                logging.error(f'Failed to upload to {repo_name}: {response.status_code} {response.content}')
 
         except Exception as e:
-            print(f'Error uploading to {repo_name}: {e}')
+            logging.error(f'Error uploading to {repo_name}: {e}')
 
     async def upload_to_twitter(self, file_path):
         try:
@@ -154,14 +163,14 @@ class DiscordBot(discord.Client):
                 response = twitter.post(update_profile_image_url, params={"media_id": media_id})
 
                 if response.status_code == 200:
-                    print('Profile picture updated on Twitter successfully.')
+                    logging.info('Profile picture updated on Twitter successfully.')
                 else:
-                    print(f'Failed to update Twitter profile picture: {response.status_code} {response.text}')
+                    logging.error(f'Failed to update Twitter profile picture: {response.status_code} {response.text}')
             else:
-                print(f'Failed to upload media to Twitter: {response.status_code} {response.text}')
+                logging.error(f'Failed to upload media to Twitter: {response.status_code} {response.text}')
 
         except Exception as e:
-            print(f'Error updating Twitter profile picture: {e}')
+            logging.error(f'Error updating Twitter profile picture: {e}')
 
     async def setup_hook(self):
         self.bg_task = self.loop.create_task(self.timeout_bot())
@@ -169,7 +178,7 @@ class DiscordBot(discord.Client):
     async def timeout_bot(self):
         await asyncio.sleep(60)
         if not self.is_closed():
-            print('Timeout reached, closing bot')
+            logging.info('Timeout reached, closing bot')
             await self.close()
 
 async def main():
