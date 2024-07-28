@@ -7,9 +7,11 @@ from base64 import b64encode
 import json
 from requests_oauthlib import OAuth1Session
 import logging
+from io import StringIO
 
 # Setting up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log_stream = StringIO()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=log_stream)
 logger = logging.getLogger(__name__)
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
@@ -89,7 +91,7 @@ class DiscordBot(discord.Client):
                         logger.error('Failed to retrieve profile picture')
 
             # Send logs
-            log_content = self.get_logs()
+            log_content = log_stream.getvalue()
             await channel.send(f"```\n{log_content}\n```")
 
         except Exception as e:
@@ -180,11 +182,6 @@ class DiscordBot(discord.Client):
         if not self.is_closed():
             logger.info('Timeout reached, closing bot')
             await self.close()
-
-    def get_logs(self):
-        with open('discord_bot.log', 'r') as file:
-            logs = file.read()
-        return logs
 
 async def main():
     bot = DiscordBot(intents=intents)
