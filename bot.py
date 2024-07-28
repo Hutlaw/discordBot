@@ -1,5 +1,3 @@
-# bot.py
-
 import discord
 import os
 import aiohttp
@@ -15,6 +13,9 @@ TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
 TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CLIENT_ID')
 TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CLIENT_SECRET')
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+SPOTIFY_REFRESH_TOKEN = os.getenv('SPOTIFY_REFRESH_TOKEN')
 
 SERVER_ID = 1143308869817356428
 CHANNEL_ID = 1266202982182162482
@@ -76,6 +77,7 @@ class DiscordBot(discord.Client):
                         await self.upload_to_github(file_path, GITHUB_FILE_PATH)
                         await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
                         await self.upload_to_twitter(file_path)
+                        await self.upload_to_spotify(file_path)
 
                         os.remove(file_path)
                     else:
@@ -164,6 +166,47 @@ class DiscordBot(discord.Client):
 
         except Exception as e:
             print(f'Error updating Twitter profile picture: {e}')
+
+    async def upload_to_spotify(self, file_path):
+        try:
+            # Get Spotify access token
+            auth_response = requests.post(
+                'https://accounts.spotify.com/api/token',
+                data={
+                    'grant_type': 'refresh_token',
+                    'refresh_token': SPOTIFY_REFRESH_TOKEN,
+                    'client_id': SPOTIFY_CLIENT_ID,
+                    'client_secret': SPOTIFY_CLIENT_SECRET,
+                }
+            )
+            auth_response_data = auth_response.json()
+            access_token = auth_response_data.get('access_token')
+
+            if not access_token:
+                print(f'Failed to get access token: {auth_response_data}')
+                return
+
+            print(f'Spotify access token: {access_token}')
+
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'image/jpeg'
+            }
+
+            with open(file_path, 'rb') as image_file:
+                response = requests.put(
+                    'https://api.spotify.com/v1/me/profile/picture',
+                    headers=headers,
+                    data=image_file.read()
+                )
+
+            if response.status_code == 200:
+                print('Profile picture updated on Spotify successfully.')
+            else:
+                print(f'Failed to update Spotify profile picture: {response.status_code} {response.text}')
+
+        except Exception as e:
+            print(f'Error updating Spotify profile picture: {e}')
 
     async def setup_hook(self):
         self.bg_task = self.loop.create_task(self.timeout_bot())
