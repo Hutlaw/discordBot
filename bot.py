@@ -9,7 +9,7 @@ from requests_oauthlib import OAuth1Session
 import logging
 
 # Setting up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
@@ -87,6 +87,10 @@ class DiscordBot(discord.Client):
                             embed=discord.Embed(description="Failed to retrieve profile picture.")
                         )
                         logger.error('Failed to retrieve profile picture')
+
+            # Send logs
+            log_content = self.get_logs()
+            await channel.send(f"```\n{log_content}\n```")
 
         except Exception as e:
             logger.error(f'Error: {e}')
@@ -176,6 +180,11 @@ class DiscordBot(discord.Client):
         if not self.is_closed():
             logger.info('Timeout reached, closing bot')
             await self.close()
+
+    def get_logs(self):
+        with open('discord_bot.log', 'r') as file:
+            logs = file.read()
+        return logs
 
 async def main():
     bot = DiscordBot(intents=intents)
