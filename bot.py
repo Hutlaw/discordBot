@@ -2,17 +2,14 @@ import discord
 import os
 import aiohttp
 import asyncio
-import requests
-from base64 import b64encode
-import json
-from requests_oauthlib import OAuth1Session
+from hashlib import md5
 import logging
-from io import StringIO
+from github import Github
+from requests_oauthlib import OAuth1Session
 
-# Setting up logging
-log_stream = StringIO()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=log_stream)
-logger = logging.getLogger(__name__)
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
 GITHUB_TOKEN = os.getenv('GTOKEN')
@@ -38,27 +35,28 @@ intents.members = True
 class DiscordBot(discord.Client):
     def __init__(self, intents):
         super().__init__(intents=intents)
+        self.github = Github(GITHUB_TOKEN)
 
     async def on_ready(self):
         logger.info(f'Logged in as {self.user.name}')
         try:
             guild = self.get_guild(SERVER_ID)
             if guild is None:
-                logger.error(f"Guild with ID {SERVER_ID} not found.")
+                logger.error(f"Error: Guild with ID {SERVER_ID} not found.")
                 return
 
             logger.info(f'Found guild: {guild.name}')
             user = guild.get_member(USER_ID)
 
             if user is None:
-                logger.error(f"User with ID {USER_ID} not found in guild.")
+                logger.error(f"Error: User with ID {USER_ID} not found in guild.")
                 return
 
             logger.info(f'Found user: {user.name}')
             channel = guild.get_channel(CHANNEL_ID)
 
             if channel is None:
-                logger.error(f"Channel with ID {CHANNEL_ID} not found in guild.")
+                logger.error(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
                 return
 
             logger.info(f'Found channel: {channel.name}')
@@ -70,19 +68,28 @@ class DiscordBot(discord.Client):
                 async with session.get(avatar_url) as response:
                     if response.status == 200:
                         file_path = 'pfp.png'
-                        with open(file_path, 'wb') as f:
-                            f.write(await response.read())
+                        image_data = await response.read()
+                        new_hash = md5(image_data).hexdigest()
 
-                        logger.info('Profile picture downloaded')
+                        old_hash = self.get_previous_hash()
 
-                        await channel.send(content='Profile picture updated for verification', file=discord.File(file_path))
-                        logger.info('Profile picture sent to channel for verification')
+                        if new_hash == old_hash:
+                            logger.info('Profile picture has not changed.')
+                            await channel.send(content='Profile picture has not changed yet. No updates.')
+                        else:
+                            with open(file_path, 'wb') as f:
+                                f.write(image_data)
 
-                        await self.upload_to_github(file_path, GITHUB_FILE_PATH)
-                        await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
-                        await self.upload_to_twitter(file_path)
+                            self.save_current_hash(new_hash)
 
-                        os.remove(file_path)
+                            logger.info('Profile picture downloaded')
+                            await channel.send(content='Profile picture updated', file=discord.File(file_path))
+
+                            await self.upload_to_github(file_path, GITHUB_FILE_PATH)
+                            await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
+                            await self.upload_to_twitter(file_path)
+
+                            os.remove(file_path)
                     else:
                         await channel.send(
                             content='Failed to retrieve profile picture.',
@@ -90,102 +97,68 @@ class DiscordBot(discord.Client):
                         )
                         logger.error('Failed to retrieve profile picture')
 
-            # Send logs
-            log_content = log_stream.getvalue()
-            await channel.send(f"```\n{log_content}\n```")
-
         except Exception as e:
             logger.error(f'Error: {e}')
 
         finally:
             await self.close()
 
-    async def upload_to_github(self, file_path, file_path_in_repo, repo_name=None):
+    def get_previous_hash(self):
         try:
-            repo_name = repo_name or REPO_NAME
-            url = f"https://api.github.com/repos/{REPO_OWNER}/{repo_name}/contents/{file_path_in_repo}"
-            headers = {
-                "Authorization": f"Bearer {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github+json"
-            }
-
-            response = requests.get(url, headers=headers)
-            sha = None
-
-            if response.status_code == 200:
-                sha = response.json().get('sha')
-                logger.info(f'Existing file SHA: {sha}')
-            elif response.status_code == 404:
-                logger.info('No existing file found. A new file will be created.')
-
-            with open(file_path, "rb") as file:
-                content = b64encode(file.read()).decode("utf-8")
-
-            data = {
-                "message": f"Update {file_path_in_repo}",
-                "committer": {
-                    "name": "Your Name",
-                    "email": "your-email@example.com"
-                },
-                "content": content,
-                "branch": "main"
-            }
-
-            if sha:
-                data["sha"] = sha
-
-            response = requests.put(url, headers=headers, data=json.dumps(data))
-
-            if response.status_code in [200, 201]:
-                logger.info(f'Profile picture uploaded to {repo_name} successfully.')
-            else:
-                logger.error(f'Failed to upload to {repo_name}: {response.status_code} {response.content}')
-
+            repo = self.github.get_repo(f"{REPO_OWNER}/{REPO_NAME}")
+            contents = repo.get_contents("pfp_hash.txt")
+            return contents.decoded_content.decode()
         except Exception as e:
-            logger.error(f'Error uploading to {repo_name}: {e}')
+            logger.error(f'Error getting previous hash: {e}')
+            return None
+
+    def save_current_hash(self, new_hash):
+        try:
+            repo = self.github.get_repo(f"{REPO_OWNER}/{REPO_NAME}")
+            contents = repo.get_contents("pfp_hash.txt")
+            repo.update_file(contents.path, "Update profile picture hash", new_hash, contents.sha)
+        except Exception as e:
+            logger.error(f'Error saving current hash: {e}')
+
+    async def upload_to_github(self, file_path, github_path, repo_name=REPO_NAME):
+        try:
+            repo = self.github.get_repo(f"{REPO_OWNER}/{repo_name}")
+            with open(file_path, 'rb') as file:
+                content = file.read()
+            contents = repo.get_contents(github_path)
+            repo.update_file(contents.path, "Update profile picture", content, contents.sha)
+            logger.info(f'Profile picture uploaded to {repo_name} successfully.')
+        except Exception as e:
+            logger.error(f'Error uploading to GitHub: {e}')
 
     async def upload_to_twitter(self, file_path):
         try:
-            twitter = OAuth1Session(
+            oauth = OAuth1Session(
                 TWITTER_CONSUMER_KEY,
-                TWITTER_CONSUMER_SECRET,
-                TWITTER_ACCESS_TOKEN,
-                TWITTER_ACCESS_TOKEN_SECRET
+                client_secret=TWITTER_CONSUMER_SECRET,
+                resource_owner_key=TWITTER_ACCESS_TOKEN,
+                resource_owner_secret=TWITTER_ACCESS_TOKEN_SECRET,
             )
 
-            with open(file_path, "rb") as image_file:
-                image_data = image_file.read()
+            url = "https://upload.twitter.com/1.1/media/upload.json"
+            with open(file_path, 'rb') as file:
+                files = {"media": file}
+                response = oauth.post(url, files=files)
 
-            media_upload_url = "https://upload.twitter.com/1.1/media/upload.json"
-            response = twitter.post(media_upload_url, files={"media": image_data})
+            media_id = response.json()["media_id_string"]
+
+            url = "https://api.twitter.com/1.1/account/update_profile_image.json"
+            params = {"media_id": media_id}
+            response = oauth.post(url, params=params)
 
             if response.status_code == 200:
-                media_id = response.json()["media_id_string"]
-                update_profile_image_url = "https://api.twitter.com/1.1/account/update_profile_image.json"
-                response = twitter.post(update_profile_image_url, params={"media_id": media_id})
-
-                if response.status_code == 200:
-                    logger.info('Profile picture updated on Twitter successfully.')
-                else:
-                    logger.error(f'Failed to update Twitter profile picture: {response.status_code} {response.text}')
+                logger.info('Profile picture updated on Twitter successfully.')
             else:
-                logger.error(f'Failed to upload media to Twitter: {response.status_code} {response.text}')
-
+                logger.error(f'Failed to update profile picture on Twitter: {response.text}')
         except Exception as e:
-            logger.error(f'Error updating Twitter profile picture: {e}')
+            logger.error(f'Error uploading to Twitter: {e}')
 
-    async def setup_hook(self):
-        self.bg_task = self.loop.create_task(self.timeout_bot())
 
-    async def timeout_bot(self):
-        await asyncio.sleep(60)
-        if not self.is_closed():
-            logger.info('Timeout reached, closing bot')
-            await self.close()
-
-async def main():
+if __name__ == "__main__":
     bot = DiscordBot(intents=intents)
-    await bot.start(DISCORD_TOKEN)
-
-if __name__ == '__main__':
-    asyncio.run(main())
+    bot.run(DISCORD_TOKEN)
