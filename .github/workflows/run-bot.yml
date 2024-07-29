@@ -25,3 +25,8 @@ jobs:
 
       - name: Run bot script
         run: python bot.py
+
+      - name: Cleanup workspace
+        run: |
+          git clean -fdx
+          git reset --hard
