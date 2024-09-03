@@ -6,26 +6,15 @@ from github import Github
 from requests_oauthlib import OAuth1Session
 import asyncio
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Set to DEBUG for more detailed logs
 logger = logging.getLogger()
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
 GITHUB_TOKEN = os.getenv('GTOKEN')
-TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
-TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
-TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CLIENT_ID')
-TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CLIENT_SECRET')
 
 SERVER_ID = 1143308869817356428
 CHANNEL_ID = 1266202982182162482
 USER_ID = 849456491131043840
-
-REPO_OWNER = "hutlaw"
-REPO_NAME = "discordBot"
-AVATAR_URL_FILE_PATH = "avatar_url.txt"
-
-WEBSITE_REPO_NAME = "hutlaw.github.io"
-WEBSITE_FILE_PATH = "images/pfp.png"
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -37,23 +26,30 @@ class DiscordBot(discord.Client):
 
     async def on_ready(self):
         logger.info(f'Logged in as {self.user.name}')
+        
         guild = self.get_guild(SERVER_ID)
         if not guild:
-            logger.error("Guild not found.")
+            logger.error("Guild not found. Check SERVER_ID.")
             await self.close()
             return
+        else:
+            logger.debug(f"Guild found: {guild.name}")
 
         channel = guild.get_channel(CHANNEL_ID)
         if not channel:
-            logger.error("Channel not found.")
+            logger.error("Channel not found. Check CHANNEL_ID.")
             await self.close()
             return
+        else:
+            logger.debug(f"Channel found: {channel.name}")
 
         user = guild.get_member(USER_ID)
         if not user:
-            logger.error("User not found.")
+            logger.error("User not found. Check USER_ID.")
             await self.close()
             return
+        else:
+            logger.debug(f"User found: {user.name}")
 
         avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
         old_avatar_url = self.get_previous_avatar_url()
@@ -63,24 +59,8 @@ class DiscordBot(discord.Client):
         else:
             await self.update_avatar(channel, avatar_url)
 
-        await channel.send(content='Type `!continue` within 5 minutes to keep the bot active.')
+        await channel.send(content=f'{user.mention} Type `!continue` within 5 minutes to keep the bot active.')
         self.keep_alive_task = self.loop.create_task(self.wait_for_command(channel))
-
-    async def update_avatar(self, channel, avatar_url):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(avatar_url) as response:
-                if response.status == 200:
-                    file_path = 'pfp.png'
-                    with open(file_path, 'wb') as f:
-                        f.write(await response.read())
-
-                    self.save_current_avatar_url(avatar_url)
-                    await channel.send(content='Profile picture updated', file=discord.File(file_path))
-                    await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
-                    await self.upload_to_twitter(file_path)
-                    os.remove(file_path)
-                else:
-                    await channel.send(content='Failed to retrieve profile picture.')
 
     async def wait_for_command(self, channel):
         def check(m):
