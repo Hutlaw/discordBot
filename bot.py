@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 DTOKEN = os.getenv("DTOKEN")
 GITHUB_TOKEN = os.getenv("GTOKEN")
-USER_ID = 849456491131043840  # Your Discord user ID as an integer
+USER_ID = 849456491131043840
 GUILD_NAME = "hutlaw's server"
 CHANNEL_NAME = "bot-stuff"
 REPO_NAME = "hutlaw.github.io"
@@ -39,18 +39,20 @@ class DiscordBot(discord.Client):
 
     async def send_command_prompt(self, channel, user):
         await channel.send(f"{user.mention} Please send the command `!continue` to proceed.")
+        await self.wait_for_command(channel, user)
+
+    async def wait_for_command(self, channel, user):
         try:
             msg = await self.wait_for(
                 'message',
                 check=lambda message: message.author == user and message.channel == channel and message.content.lower() == "!continue",
-                timeout=300.0  # 5 minutes
+                timeout=None
             )
             if msg:
                 await self.perform_action(channel)
-        except discord.errors.NotFound:
-            logging.error("Message not found during waiting.")
         except Exception as e:
             logging.error(f"Error while waiting for command: {str(e)}")
+            await channel.send(f"Error while waiting for command: {str(e)}")
 
     async def perform_action(self, channel):
         await channel.send("Performing action to maintain Active Developer status...")
