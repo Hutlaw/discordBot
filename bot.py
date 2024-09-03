@@ -4,14 +4,14 @@ import aiohttp
 import logging
 from github import Github
 from requests_oauthlib import OAuth1Session
+import asyncio
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
 GITHUB_TOKEN = os.getenv('GTOKEN')
-TWITER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
+TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
 TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CLIENT_ID')
 TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CLIENT_SECRET')
@@ -28,7 +28,7 @@ WEBSITE_REPO_NAME = "hutlaw.github.io"
 WEBSITE_FILE_PATH = "images/pfp.png"
 
 intents = discord.Intents.default()
-intents.members = True
+intents.messages = True
 
 class DiscordBot(discord.Client):
     def __init__(self, intents):
@@ -37,68 +37,63 @@ class DiscordBot(discord.Client):
 
     async def on_ready(self):
         logger.info(f'Logged in as {self.user.name}')
-        try:
-            guild = self.get_guild(SERVER_ID)
-            if guild is None:
-                logger.error(f"Error: Guild with ID {SERVER_ID} not found.")
-                return
-
-            logger.info(f'Found guild: {guild.name}')
-            user = guild.get_member(USER_ID)
-
-            if user is None:
-                logger.error(f"Error: User with ID {USER_ID} not found in guild.")
-                return
-
-            logger.info(f'Found user: {user.name}')
-            channel = guild.get_channel(CHANNEL_ID)
-
-            if channel is None:
-                logger.error(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
-                return
-
-            logger.info(f'Found channel: {channel.name}')
-
-            avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
-            logger.info(f'User avatar URL: {avatar_url}')
-
-            old_avatar_url = self.get_previous_avatar_url()
-
-            if avatar_url == old_avatar_url:
-                logger.info('Profile picture has not changed.')
-                await channel.send(content='Profile picture has not changed yet. No updates.')
-            else:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(avatar_url) as response:
-                        if response.status == 200:
-                            file_path = 'pfp.png'
-                            image_data = await response.read()
-
-                            with open(file_path, 'wb') as f:
-                                f.write(image_data)
-
-                            self.save_current_avatar_url(avatar_url)
-
-                            logger.info('Profile picture downloaded')
-                            await channel.send(content='Profile picture updated', file=discord.File(file_path))
-
-                            await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
-                            await self.upload_to_twitter(file_path)
-
-                            os.remove(file_path)
-                        else:
-                            await channel.send(
-                                content='Failed to retrieve profile picture.',
-                                embed=discord.Embed(description="Failed to retrieve profile picture.")
-                            )
-                            logger.error('Failed to retrieve profile picture')
-
-        except Exception as e:
-            logger.error(f'Error: {e}')
-            await channel.send(content=f"An error occurred: {e}")
-
-        finally:
+        guild = self.get_guild(SERVER_ID)
+        if not guild:
+            logger.error("Guild not found.")
             await self.close()
+            return
+
+        channel = guild.get_channel(CHANNEL_ID)
+        if not channel:
+            logger.error("Channel not found.")
+            await self.close()
+            return
+
+        user = guild.get_member(USER_ID)
+        if not user:
+            logger.error("User not found.")
+            await self.close()
+            return
+
+        avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
+        old_avatar_url = self.get_previous_avatar_url()
+
+        if avatar_url == old_avatar_url:
+            await channel.send(content='Profile picture has not changed. No updates.')
+        else:
+            await self.update_avatar(channel, avatar_url)
+
+        await self.wait_for_command(channel)
+
+        await self.close()
+
+    async def update_avatar(self, channel, avatar_url):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(avatar_url) as response:
+                if response.status == 200:
+                    file_path = 'pfp.png'
+                    with open(file_path, 'wb') as f:
+                        f.write(await response.read())
+
+                    self.save_current_avatar_url(avatar_url)
+                    await channel.send(content='Profile picture updated', file=discord.File(file_path))
+                    await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
+                    await self.upload_to_twitter(file_path)
+                    os.remove(file_path)
+                else:
+                    await channel.send(content='Failed to retrieve profile picture.')
+
+    async def wait_for_command(self, channel):
+        await channel.send(content='Respond with "continue" within 5 minutes to keep the bot active.')
+
+        def check(m):
+            return m.author.id == USER_ID and m.content.lower() == "continue"
+
+        try:
+            await self.wait_for('message', timeout=300, check=check)
+            await channel.send(content='Bot will remain active.')
+        except asyncio.TimeoutError:
+            await channel.send(content='No response received. Bot shutting down.')
 
     def get_previous_avatar_url(self):
         try:
@@ -124,7 +119,6 @@ class DiscordBot(discord.Client):
                 content = file.read()
             contents = repo.get_contents(github_path)
             repo.update_file(contents.path, "Update profile picture", content, contents.sha)
-            logger.info(f'Profile picture uploaded to {repo_name} successfully.')
         except Exception as e:
             logger.error(f'Error uploading to GitHub: {e}')
 
@@ -136,22 +130,19 @@ class DiscordBot(discord.Client):
                 resource_owner_key=TWITTER_ACCESS_TOKEN,
                 resource_owner_secret=TWITTER_ACCESS_TOKEN_SECRET,
             )
-
             url = "https://upload.twitter.com/1.1/media/upload.json"
             with open(file_path, 'rb') as file:
-                files = {"media": file}
-                response = oauth.post(url, files=files)
+                response = oauth.post(url, files={"media": file})
 
-            media_id = response.json()["media_id_string"]
+            media_id = response.json().get("media_id_string")
+            if media_id:
+                params = {"media_id": media_id}
+                response = oauth.post("https://api.twitter.com/1.1/account/update_profile_image.json", params=params)
 
-            url = "https://api.twitter.com/1.1/account/update_profile_image.json"
-            params = {"media_id": media_id}
-            response = oauth.post(url, params=params)
-
-            if response.status_code == 200:
-                logger.info('Profile picture updated on Twitter successfully.')
-            else:
-                logger.error(f'Failed to update profile picture on Twitter: {response.text}')
+                if response.status_code == 200:
+                    logger.info('Profile picture updated on Twitter successfully.')
+                else:
+                    logger.error(f'Failed to update profile picture on Twitter: {response.text}')
         except Exception as e:
             logger.error(f'Error uploading to Twitter: {e}')
 
