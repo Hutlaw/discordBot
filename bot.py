@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 DTOKEN = os.getenv("DTOKEN")
 GITHUB_TOKEN = os.getenv("GTOKEN")
-USER_ID = 849456491131043840
+USER_ID = 849456491131043840  # Your Discord user ID as an integer
 GUILD_NAME = "hutlaw's server"
 CHANNEL_NAME = "bot-stuff"
 REPO_NAME = "hutlaw.github.io"
@@ -29,7 +29,7 @@ class DiscordBot(discord.Client):
                 for member in members:
                     logging.debug(f"Member: {member.name}, ID: {member.id}")
                     if member.id == USER_ID:
-                        await self.wait_for_command(channel, member)
+                        await self.send_command_prompt(channel, member)
                         return
                 logging.error("User not found. Check USER_ID.")
             else:
@@ -37,31 +37,39 @@ class DiscordBot(discord.Client):
         else:
             logging.error(f"Guild '{GUILD_NAME}' not found.")
 
-    async def wait_for_command(self, channel, user):
-        await channel.send(f"{user.mention} The bot is ready to accept your command.")
+    async def send_command_prompt(self, channel, user):
+        await channel.send(f"{user.mention} Please send the command `!continue` to proceed.")
         try:
             msg = await self.wait_for(
                 'message',
-                check=lambda message: message.author == user and message.channel == channel,
-                timeout=1200.0  # 20 minutes
+                check=lambda message: message.author == user and message.channel == channel and message.content.lower() == "!continue",
+                timeout=300.0  # 5 minutes
             )
-            if msg.content.lower() == "!update":
-                await self.update_profile_picture(channel)
+            if msg:
+                await self.perform_action(channel)
         except discord.errors.NotFound:
             logging.error("Message not found during waiting.")
         except Exception as e:
             logging.error(f"Error while waiting for command: {str(e)}")
 
+    async def perform_action(self, channel):
+        await channel.send("Performing action to maintain Active Developer status...")
+        try:
+            await self.update_profile_picture(channel)
+        except Exception as e:
+            logging.error(f"Error while performing action: {str(e)}")
+            await channel.send(f"Error while performing action: {str(e)}")
+
     async def update_profile_picture(self, channel):
         await channel.send("Updating profile picture...")
         try:
-            self.upload_to_github('pfp.png', IMAGE_PATH, REPO_NAME)
+            self.upload_to_github(IMAGE_PATH, 'pfp.png', REPO_NAME)
             await channel.send("Profile picture updated successfully!")
         except Exception as e:
             logging.error(f"Failed to update profile picture: {str(e)}")
             await channel.send(f"Failed to update profile picture: {str(e)}")
 
-    async def upload_to_github(self, file_path, github_path, repo_name):
+    def upload_to_github(self, file_path, github_path, repo_name):
         from github import Github
 
         g = Github(GITHUB_TOKEN)
