@@ -16,6 +16,10 @@ SERVER_ID = 1143308869817356428
 CHANNEL_ID = 1266202982182162482
 USER_ID = 849456491131043840
 
+REPO_OWNER = "Hutlaw"
+REPO_NAME = "discordBot"
+AVATAR_URL_FILE_PATH = "pfp.png"
+
 intents = discord.Intents.default()
 intents.messages = True
 
