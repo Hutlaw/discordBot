@@ -6,7 +6,7 @@ from github import Github
 from requests_oauthlib import OAuth1Session
 import asyncio
 
-logging.basicConfig(level=logging.DEBUG)  # Set to DEBUG for more detailed logs
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
@@ -18,10 +18,14 @@ USER_ID = 849456491131043840
 
 REPO_OWNER = "Hutlaw"
 REPO_NAME = "discordBot"
-AVATAR_URL_FILE_PATH = "pfp.png"
+AVATAR_URL_FILE_PATH = "pfp.png" 
+
+TARGET_REPO_NAME = "hutlaw.github.io"
+TARGET_AVATAR_PATH = "main/images/pfp.png"
 
 intents = discord.Intents.default()
 intents.messages = True
+intents.guilds = True  
 
 class DiscordBot(discord.Client):
     def __init__(self, intents):
@@ -46,6 +50,11 @@ class DiscordBot(discord.Client):
             return
         else:
             logger.debug(f"Channel found: {channel.name}")
+
+        # Print all members in the guild for debugging
+        logger.debug("Members in the guild:")
+        for member in guild.members:
+            logger.debug(f"Member: {member.name}, ID: {member.id}")
 
         user = guild.get_member(USER_ID)
         if not user:
@@ -79,8 +88,8 @@ class DiscordBot(discord.Client):
 
     def get_previous_avatar_url(self):
         try:
-            repo = self.github.get_repo(f"{REPO_OWNER}/{REPO_NAME}")
-            contents = repo.get_contents(AVATAR_URL_FILE_PATH)
+            repo = self.github.get_repo(f"{REPO_OWNER}/{TARGET_REPO_NAME}")
+            contents = repo.get_contents(TARGET_AVATAR_PATH)
             return contents.decoded_content.decode()
         except Exception as e:
             logger.error(f'Error getting previous avatar URL: {e}')
@@ -88,13 +97,13 @@ class DiscordBot(discord.Client):
 
     def save_current_avatar_url(self, avatar_url):
         try:
-            repo = self.github.get_repo(f"{REPO_OWNER}/{REPO_NAME}")
-            contents = repo.get_contents(AVATAR_URL_FILE_PATH)
+            repo = self.github.get_repo(f"{REPO_OWNER}/{TARGET_REPO_NAME}")
+            contents = repo.get_contents(TARGET_AVATAR_PATH)
             repo.update_file(contents.path, "Update avatar URL", avatar_url, contents.sha)
         except Exception as e:
             logger.error(f'Error saving current avatar URL: {e}')
 
-    async def upload_to_github(self, file_path, github_path, repo_name=REPO_NAME):
+    async def upload_to_github(self, file_path, github_path, repo_name=TARGET_REPO_NAME):
         try:
             repo = self.github.get_repo(f"{REPO_OWNER}/{repo_name}")
             with open(file_path, 'rb') as file:
