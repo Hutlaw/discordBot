@@ -22,9 +22,9 @@ class DiscordBot(discord.Client):
         if guild:
             channel = discord.utils.get(guild.text_channels, name=CHANNEL_NAME)
             logging.debug(f"Channel found: {channel.name if channel else 'None'}")
-            
+
             if channel:
-                members = await guild.fetch_members().flatten()
+                members = [member async for member in guild.fetch_members()]
                 logging.debug("Members in the guild:")
                 for member in members:
                     logging.debug(f"Member: {member.name}, ID: {member.id}")
