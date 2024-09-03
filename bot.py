@@ -63,9 +63,8 @@ class DiscordBot(discord.Client):
         else:
             await self.update_avatar(channel, avatar_url)
 
-        await self.wait_for_command(channel)
-
-        await self.close()
+        await channel.send(content='Type `!continue` within 5 minutes to keep the bot active.')
+        self.keep_alive_task = self.loop.create_task(self.wait_for_command(channel))
 
     async def update_avatar(self, channel, avatar_url):
         async with aiohttp.ClientSession() as session:
@@ -84,16 +83,15 @@ class DiscordBot(discord.Client):
                     await channel.send(content='Failed to retrieve profile picture.')
 
     async def wait_for_command(self, channel):
-        await channel.send(content='Respond with "continue" within 5 minutes to keep the bot active.')
-
         def check(m):
-            return m.author.id == USER_ID and m.content.lower() == "continue"
+            return m.author.id == USER_ID and m.content.lower() == "!continue"
 
         try:
             await self.wait_for('message', timeout=300, check=check)
             await channel.send(content='Bot will remain active.')
         except asyncio.TimeoutError:
             await channel.send(content='No response received. Bot shutting down.')
+            await self.close()
 
     def get_previous_avatar_url(self):
         try:
