@@ -27,6 +27,3 @@ jobs:
           GTOKEN: ${{ secrets.GTOKEN }}
         run: |
           python bot.py
-
-      - name: Wait for manual command
-        run: sleep 300
