@@ -58,16 +58,19 @@ def delete_run(run_id):
     response.raise_for_status()
 
 def log_cleanup(details):
-    logs = []
+    logs = {}
 
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as file:
             logs = json.load(file)
 
-    logs.append(details)
+    if 'cleanup_logs' not in logs:
+        logs['cleanup_logs'] = []
 
-    if len(logs) > MAX_LOG_ENTRIES:
-        logs = logs[-MAX_LOG_ENTRIES:]
+    logs['cleanup_logs'].append(details)
+
+    if len(logs['cleanup_logs']) > MAX_LOG_ENTRIES:
+        logs['cleanup_logs'] = logs['cleanup_logs'][-MAX_LOG_ENTRIES:]
 
     with open(LOG_FILE, "w") as file:
         json.dump(logs, file, indent=4)
