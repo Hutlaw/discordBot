@@ -12,7 +12,7 @@ logger = logging.getLogger()
 
 DISCORD_TOKEN = os.getenv('DTOKEN')
 GITHUB_TOKEN = os.getenv('GTOKEN')
-TWITER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
+TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
 TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CLIENT_ID')
 TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CLIENT_SECRET')
@@ -157,7 +157,7 @@ class DiscordBot(discord.Client):
             oauth = OAuth1Session(
                 TWITTER_CONSUMER_KEY,
                 client_secret=TWITTER_CONSUMER_SECRET,
-                resource_owner_key=TWITER_ACCESS_TOKEN,
+                resource_owner_key=TWITTER_ACCESS_TOKEN,
                 resource_owner_secret=TWITTER_ACCESS_TOKEN_SECRET,
             )
 
@@ -180,16 +180,16 @@ class DiscordBot(discord.Client):
             logger.error(f'Error uploading to Twitter: {e}')
 
     def log_bot_run(self, details):
-        logs = []
+        logs = {"bot_logs": []}
 
         if os.path.exists(LOG_FILE):
             with open(LOG_FILE, "r") as file:
                 logs = json.load(file)
 
-        logs.append(details)
+        logs["bot_logs"].append(details)
 
-        if len(logs) > MAX_LOG_ENTRIES:
-            logs = logs[-MAX_LOG_ENTRIES:]
+        if len(logs["bot_logs"]) > MAX_LOG_ENTRIES:
+            logs["bot_logs"] = logs["bot_logs"][-MAX_LOG_ENTRIES:]
 
         with open(LOG_FILE, "w") as file:
             json.dump(logs, file, indent=4)
