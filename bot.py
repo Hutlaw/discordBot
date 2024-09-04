@@ -44,32 +44,23 @@ class DiscordBot(discord.Client):
         try:
             guild = self.get_guild(SERVER_ID)
             if guild is None:
-                logger.error(f"Error: Guild with ID {SERVER_ID} not found.")
                 return
 
-            logger.info(f'Found guild: {guild.name}')
             user = guild.get_member(USER_ID)
 
             if user is None:
-                logger.error(f"Error: User with ID {USER_ID} not found in guild.")
                 return
 
-            logger.info(f'Found user: {user.name}')
             channel = guild.get_channel(CHANNEL_ID)
 
             if channel is None:
-                logger.error(f"Error: Channel with ID {CHANNEL_ID} not found in guild.")
                 return
 
-            logger.info(f'Found channel: {channel.name}')
-
             avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
-            logger.info(f'User avatar URL: {avatar_url}')
 
             old_avatar_url = self.get_previous_avatar_url()
 
             if avatar_url == old_avatar_url:
-                logger.info('Profile picture has not changed.')
                 await channel.send(content='Profile picture has not changed yet. No updates.')
             else:
                 async with aiohttp.ClientSession() as session:
@@ -83,19 +74,12 @@ class DiscordBot(discord.Client):
 
                             self.save_current_avatar_url(avatar_url)
 
-                            logger.info('Profile picture downloaded')
                             await channel.send(content='Profile picture updated', file=discord.File(file_path))
 
                             await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
                             await self.upload_to_twitter(file_path)
 
                             os.remove(file_path)
-                        else:
-                            await channel.send(
-                                content='Failed to retrieve profile picture.',
-                                embed=discord.Embed(description="Failed to retrieve profile picture.")
-                            )
-                            logger.error('Failed to retrieve profile picture')
 
             log_details = {
                 "timestamp": datetime.now().isoformat(),
@@ -110,7 +94,6 @@ class DiscordBot(discord.Client):
             self.log_bot_run(log_details)
 
         except Exception as e:
-            logger.error(f'Error: {e}')
             await channel.send(content=f"An error occurred: {e}")
 
             log_details = {
@@ -130,7 +113,6 @@ class DiscordBot(discord.Client):
             contents = repo.get_contents(AVATAR_URL_FILE_PATH)
             return contents.decoded_content.decode()
         except Exception as e:
-            logger.error(f'Error getting previous avatar URL: {e}')
             return None
 
     def save_current_avatar_url(self, avatar_url):
@@ -139,7 +121,7 @@ class DiscordBot(discord.Client):
             contents = repo.get_contents(AVATAR_URL_FILE_PATH)
             repo.update_file(contents.path, "Update avatar URL", avatar_url, contents.sha)
         except Exception as e:
-            logger.error(f'Error saving current avatar URL: {e}')
+            pass
 
     async def upload_to_github(self, file_path, github_path, repo_name=REPO_NAME):
         try:
@@ -148,9 +130,8 @@ class DiscordBot(discord.Client):
                 content = file.read()
             contents = repo.get_contents(github_path)
             repo.update_file(contents.path, "Update profile picture", content, contents.sha)
-            logger.info(f'Profile picture uploaded to {repo_name} successfully.')
         except Exception as e:
-            logger.error(f'Error uploading to GitHub: {e}')
+            pass
 
     async def upload_to_twitter(self, file_path):
         try:
@@ -171,16 +152,11 @@ class DiscordBot(discord.Client):
             url = "https://api.twitter.com/1.1/account/update_profile_image.json"
             params = {"media_id": media_id}
             response = oauth.post(url, params=params)
-
-            if response.status_code == 200:
-                logger.info('Profile picture updated on Twitter successfully.')
-            else:
-                logger.error(f'Failed to update profile picture on Twitter: {response.text}')
         except Exception as e:
-            logger.error(f'Error uploading to Twitter: {e}')
+            pass
 
     def log_bot_run(self, details):
-        logs = {}
+        logs = {"cleanup_logs": [], "bot_logs": []}
 
         if os.path.exists(LOG_FILE):
             with open(LOG_FILE, "r") as file:
