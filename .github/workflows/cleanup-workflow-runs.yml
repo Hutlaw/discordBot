@@ -4,10 +4,15 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows: ["run-bot.yml"]
+    types:
+      - completed
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -25,5 +30,12 @@ jobs:
       env:
         REPO: ${{ github.repository }}
         TOKEN: ${{ secrets.GTOKEN }}
+      run: python cleanup_workflow_runs.py
+
+    - name: Commit and Push Logs
       run: |
-        python cleanup_workflow_runs.py
+        git config user.name "GitHub Action"
+        git config user.email "action@github.com"
+        git add logs.json
+        git commit -m "Update cleanup logs"
+        git push
