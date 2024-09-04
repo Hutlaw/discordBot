@@ -26,4 +26,4 @@ jobs:
         REPO: ${{ github.repository }}
         TOKEN: ${{ secrets.GTOKEN }}
       run: |
-        python .github/scripts/cleanup_workflow_runs.py
+        python cleanup_workflow_runs.py
