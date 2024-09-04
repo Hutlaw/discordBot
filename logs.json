@@ -21,6 +21,17 @@
                     "deleted_cancelled": 0
                 }
             ]
+        },
+        {
+            "timestamp": "2024-09-04T22:09:09.177551",
+            "details": [
+                {
+                    "workflow": "cleanup-workflow-runs.yml",
+                    "deleted_success": 0,
+                    "deleted_failure": 0,
+                    "deleted_cancelled": 0
+                }
+            ]
         }
     ]
 }
