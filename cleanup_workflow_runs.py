@@ -58,7 +58,7 @@ def delete_run(run_id):
     response.raise_for_status()
 
 def log_cleanup(details):
-    logs = {}
+    logs = {"cleanup_logs": [], "bot_logs": []}
 
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as file:
@@ -84,10 +84,8 @@ def main():
     }
 
     for workflow in workflows:
-        print(f"Processing workflow: {workflow}")
         workflow_id = get_workflow_id(workflow)
         if not workflow_id:
-            print(f"Workflow {workflow} not found.")
             continue
 
         details = {
@@ -99,19 +97,16 @@ def main():
 
         success_runs = get_runs(workflow_id, status="success", days_old=5)
         for run_id in success_runs:
-            print(f"Deleting successful run: {run_id}")
             delete_run(run_id)
             details["deleted_success"] += 1
 
         failed_runs = get_runs(workflow_id, status="failure", days_old=15)
         for run_id in failed_runs:
-            print(f"Deleting failed run: {run_id}")
             delete_run(run_id)
             details["deleted_failure"] += 1
 
         canceled_runs = get_runs(workflow_id, status="cancelled")
         for run_id in canceled_runs:
-            print(f"Deleting cancelled run: {run_id}")
             delete_run(run_id)
             details["deleted_cancelled"] += 1
 
@@ -137,5 +132,4 @@ if __name__ == "__main__":
     try:
         main()
     except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
         sys.exit(1)
