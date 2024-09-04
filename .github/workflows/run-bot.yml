@@ -38,7 +38,7 @@ jobs:
 
       - name: Log bot execution
         run: |
-          python -c "
+          python - <<EOF
 import json
 import os
 from datetime import datetime
@@ -59,7 +59,7 @@ def log_bot_run(details):
     logs['bot_logs'].append(details)
 
     if len(logs['bot_logs']) > MAX_LOG_ENTRIES:
-        logs['bot_logs'] = logs['bot_logs'][-MAX_LOG_ENTRIES:
+        logs['bot_logs'] = logs['bot_logs'][-MAX_LOG_ENTRIES:]
 
     with open(LOG_FILE, 'w') as file:
         json.dump(logs, file, indent=4)
@@ -71,4 +71,4 @@ log_details = {
     'details': {'info': 'Bot ran successfully'}
 }
 log_bot_run(log_details)
-"
+EOF
