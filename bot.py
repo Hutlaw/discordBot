@@ -112,7 +112,7 @@ class DiscordBot(discord.Client):
             repo = self.github.get_repo(f"{REPO_OWNER}/{REPO_NAME}")
             contents = repo.get_contents(AVATAR_URL_FILE_PATH)
             return contents.decoded_content.decode()
-        except Exception as e:
+        except Exception:
             return None
 
     def save_current_avatar_url(self, avatar_url):
@@ -120,7 +120,7 @@ class DiscordBot(discord.Client):
             repo = self.github.get_repo(f"{REPO_OWNER}/{REPO_NAME}")
             contents = repo.get_contents(AVATAR_URL_FILE_PATH)
             repo.update_file(contents.path, "Update avatar URL", avatar_url, contents.sha)
-        except Exception as e:
+        except Exception:
             pass
 
     async def upload_to_github(self, file_path, github_path, repo_name=REPO_NAME):
@@ -130,7 +130,7 @@ class DiscordBot(discord.Client):
                 content = file.read()
             contents = repo.get_contents(github_path)
             repo.update_file(contents.path, "Update profile picture", content, contents.sha)
-        except Exception as e:
+        except Exception:
             pass
 
     async def upload_to_twitter(self, file_path):
@@ -152,7 +152,7 @@ class DiscordBot(discord.Client):
             url = "https://api.twitter.com/1.1/account/update_profile_image.json"
             params = {"media_id": media_id}
             response = oauth.post(url, params=params)
-        except Exception as e:
+        except Exception:
             pass
 
     def log_bot_run(self, details):
