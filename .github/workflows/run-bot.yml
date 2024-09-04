@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -35,38 +35,3 @@ jobs:
           TWITTER_CLIENT_ID: ${{ secrets.TWITTER_CLIENT_ID }}
           TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
         run: python bot.py
-
-      - name: Log bot execution
-        run: |
-          echo "import json, os" > log_bot.py
-          echo "from datetime import datetime" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "LOG_FILE = 'logs.json'" >> log_bot.py
-          echo "MAX_LOG_ENTRIES = 5" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "def log_bot_run(details):" >> log_bot.py
-          echo "    logs = {}" >> log_bot.py
-          echo "    if os.path.exists(LOG_FILE):" >> log_bot.py
-          echo "        with open(LOG_FILE, 'r') as file:" >> log_bot.py
-          echo "            logs = json.load(file)" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "    if 'bot_logs' not in logs:" >> log_bot.py
-          echo "        logs['bot_logs'] = []" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "    logs['bot_logs'].append(details)" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "    if len(logs['bot_logs']) > MAX_LOG_ENTRIES:" >> log_bot.py
-          echo "        logs['bot_logs'] = logs['bot_logs'][-MAX_LOG_ENTRIES:]" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "    with open(LOG_FILE, 'w') as file:" >> log_bot.py
-          echo "        json.dump(logs, file, indent=4)" >> log_bot.py
-          echo "" >> log_bot.py
-          echo "log_details = {" >> log_bot.py
-          echo "    'timestamp': datetime.now().isoformat()," >> log_bot.py
-          echo "    'event': 'Bot execution'," >> log_bot.py
-          echo "    'success': True," >> log_bot.py
-          echo "    'details': {'info': 'Bot ran successfully'}" >> log_bot.py
-          echo "}" >> log_bot.py
-          echo "log_bot_run(log_details)" >> log_bot.py
-          
-          python log_bot.py
