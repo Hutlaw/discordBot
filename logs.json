@@ -1,0 +1,15 @@
+{
+    "cleanup_logs": [
+        {
+            "timestamp": "2024-09-04T21:53:00.361741",
+            "details": [
+                {
+                    "workflow": "cleanup-workflow-runs.yml",
+                    "deleted_success": 0,
+                    "deleted_failure": 0,
+                    "deleted_cancelled": 0
+                }
+            ]
+        }
+    ]
+}
