@@ -59,7 +59,6 @@ def log_bot_run(details):
 
     if len(logs['bot_logs']) > MAX_LOG_ENTRIES:
         logs['bot_logs'] = logs['bot_logs'][-MAX_LOG_ENTRIES:]
-
     with open(LOG_FILE, 'w') as file:
         json.dump(logs, file, indent=4)
 
