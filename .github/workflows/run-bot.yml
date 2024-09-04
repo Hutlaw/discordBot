@@ -38,36 +38,37 @@ jobs:
 
       - name: Log bot execution
         run: |
-          python -c '
-import json, os
+          python -c "
+import json
+import os
 from datetime import datetime
 
-LOG_FILE = "logs.json"
+LOG_FILE = 'logs.json'
 MAX_LOG_ENTRIES = 5
 
 def log_bot_run(details):
     logs = {}
 
     if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r") as file:
+        with open(LOG_FILE, 'r') as file:
             logs = json.load(file)
 
-    if "bot_logs" not in logs:
-        logs["bot_logs"] = []
+    if 'bot_logs' not in logs:
+        logs['bot_logs'] = []
 
-    logs["bot_logs"].append(details)
+    logs['bot_logs'].append(details)
 
-    if len(logs["bot_logs"]) > MAX_LOG_ENTRIES:
-        logs["bot_logs"] = logs["bot_logs"][-MAX_LOG_ENTRIES:]
+    if len(logs['bot_logs']) > MAX_LOG_ENTRIES:
+        logs['bot_logs'] = logs['bot_logs'][-MAX_LOG_ENTRIES:
 
-    with open(LOG_FILE, "w") as file:
+    with open(LOG_FILE, 'w') as file:
         json.dump(logs, file, indent=4)
 
 log_details = {
-    "timestamp": datetime.now().isoformat(),
-    "event": "Bot execution",
-    "success": True,
-    "details": {"info": "Bot ran successfully"}
+    'timestamp': datetime.now().isoformat(),
+    'event': 'Bot execution',
+    'success': True,
+    'details': {'info': 'Bot ran successfully'}
 }
 log_bot_run(log_details)
-'
+"
