@@ -4,8 +4,9 @@ import aiohttp
 import logging
 from github import Github
 from requests_oauthlib import OAuth1Session
+from datetime import datetime
+import json
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
@@ -26,6 +27,9 @@ AVATAR_URL_FILE_PATH = "avatar_url.txt"
 
 WEBSITE_REPO_NAME = "hutlaw.github.io"
 WEBSITE_FILE_PATH = "images/pfp.png"
+
+LOG_FILE = "logs.json"
+MAX_LOG_ENTRIES = 5
 
 intents = discord.Intents.default()
 intents.members = True
@@ -93,9 +97,29 @@ class DiscordBot(discord.Client):
                             )
                             logger.error('Failed to retrieve profile picture')
 
+            log_details = {
+                "timestamp": datetime.now().isoformat(),
+                "event": "Bot execution",
+                "success": True,
+                "details": {
+                    "guild": guild.name,
+                    "user": user.name,
+                    "channel": channel.name
+                }
+            }
+            self.log_bot_run(log_details)
+
         except Exception as e:
             logger.error(f'Error: {e}')
             await channel.send(content=f"An error occurred: {e}")
+
+            log_details = {
+                "timestamp": datetime.now().isoformat(),
+                "event": "Bot execution",
+                "success": False,
+                "error": str(e)
+            }
+            self.log_bot_run(log_details)
 
         finally:
             await self.close()
@@ -133,7 +157,7 @@ class DiscordBot(discord.Client):
             oauth = OAuth1Session(
                 TWITTER_CONSUMER_KEY,
                 client_secret=TWITTER_CONSUMER_SECRET,
-                resource_owner_key=TWITTER_ACCESS_TOKEN,
+                resource_owner_key=TWITER_ACCESS_TOKEN,
                 resource_owner_secret=TWITTER_ACCESS_TOKEN_SECRET,
             )
 
@@ -154,6 +178,22 @@ class DiscordBot(discord.Client):
                 logger.error(f'Failed to update profile picture on Twitter: {response.text}')
         except Exception as e:
             logger.error(f'Error uploading to Twitter: {e}')
+
+    def log_bot_run(self, details):
+        logs = []
+
+        if os.path.exists(LOG_FILE):
+            with open(LOG_FILE, "r") as file:
+                logs = json.load(file)
+
+        logs.append(details)
+
+        if len(logs) > MAX_LOG_ENTRIES:
+            logs = logs[-MAX_LOG_ENTRIES:]
+
+        with open(LOG_FILE, "w") as file:
+            json.dump(logs, file, indent=4)
+
 
 if __name__ == "__main__":
     bot = DiscordBot(intents=intents)
