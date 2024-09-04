@@ -1,6 +1,7 @@
-import requests
 import os
 import sys
+import json
+import requests
 from datetime import datetime, timedelta
 
 GITHUB_API_URL = "https://api.github.com"
@@ -11,17 +12,22 @@ HEADERS = {
     "Accept": "application/vnd.github.v3+json",
 }
 
-def get_runs(workflow_id, status, days_old):
-    cutoff_date = datetime.now() - timedelta(days=days_old)
-    cutoff_iso = cutoff_date.isoformat() + "Z"
+LOG_FILE = "logs.json"
+MAX_LOG_ENTRIES = 5
+
+def get_runs(workflow_id, status=None, days_old=None):
     runs = []
     page = 1
+    params = {"per_page": 100, "page": page}
+
+    if status:
+        params["status"] = status
 
     while True:
         response = requests.get(
             f"{GITHUB_API_URL}/repos/{REPO}/actions/workflows/{workflow_id}/runs",
             headers=HEADERS,
-            params={"status": status, "per_page": 100, "page": page},
+            params=params,
         )
 
         if response.status_code == 403:
@@ -32,13 +38,15 @@ def get_runs(workflow_id, status, days_old):
         data = response.json()
 
         for run in data["workflow_runs"]:
-            if run["created_at"] < cutoff_iso:
+            run_date = datetime.strptime(run["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+            if not days_old or run_date < datetime.now() - timedelta(days=days_old):
                 runs.append(run["id"])
 
         if "next" not in response.links:
             break
 
         page += 1
+        params["page"] = page
 
     return runs
 
@@ -49,8 +57,28 @@ def delete_run(run_id):
     )
     response.raise_for_status()
 
+def log_cleanup(details):
+    logs = []
+
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as file:
+            logs = json.load(file)
+
+    logs.append(details)
+
+    if len(logs) > MAX_LOG_ENTRIES:
+        logs = logs[-MAX_LOG_ENTRIES:]
+
+    with open(LOG_FILE, "w") as file:
+        json.dump(logs, file, indent=4)
+
 def main():
     workflows = ["run-bot.yml", "wait-for-command.yml"]
+
+    cleanup_details = {
+        "timestamp": datetime.now().isoformat(),
+        "details": []
+    }
 
     for workflow in workflows:
         print(f"Processing workflow: {workflow}")
@@ -59,15 +87,34 @@ def main():
             print(f"Workflow {workflow} not found.")
             continue
 
-        success_runs = get_runs(workflow_id, "success", 5)
+        details = {
+            "workflow": workflow,
+            "deleted_success": 0,
+            "deleted_failure": 0,
+            "deleted_cancelled": 0,
+        }
+
+        success_runs = get_runs(workflow_id, status="success", days_old=5)
         for run_id in success_runs:
             print(f"Deleting successful run: {run_id}")
             delete_run(run_id)
+            details["deleted_success"] += 1
 
-        failed_runs = get_runs(workflow_id, "failure", 15)
+        failed_runs = get_runs(workflow_id, status="failure", days_old=15)
         for run_id in failed_runs:
             print(f"Deleting failed run: {run_id}")
             delete_run(run_id)
+            details["deleted_failure"] += 1
+
+        canceled_runs = get_runs(workflow_id, status="cancelled")
+        for run_id in canceled_runs:
+            print(f"Deleting cancelled run: {run_id}")
+            delete_run(run_id)
+            details["deleted_cancelled"] += 1
+
+        cleanup_details["details"].append(details)
+
+    log_cleanup(cleanup_details)
 
 def get_workflow_id(workflow_name):
     response = requests.get(
