@@ -76,7 +76,7 @@ def log_cleanup(details):
         json.dump(logs, file, indent=4)
 
 def main():
-    workflows = ["run-bot.yml", "wait-for-command.yml"]
+    workflows = ["cleanup-workflow-runs.yml"]
 
     cleanup_details = {
         "timestamp": datetime.now().isoformat(),
