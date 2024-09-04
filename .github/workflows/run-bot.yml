@@ -2,8 +2,8 @@ name: run-bot
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Runs daily at midnight
-  workflow_dispatch:      # Allows manual triggering
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   run-bot:
@@ -43,16 +43,19 @@ LOG_FILE = 'logs.json'
 MAX_LOG_ENTRIES = 5
 
 def log_bot_run(details):
-    logs = []
+    logs = {}
 
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, 'r') as file:
             logs = json.load(file)
 
-    logs.append(details)
+    if 'bot_logs' not in logs:
+        logs['bot_logs'] = []
 
-    if len(logs) > MAX_LOG_ENTRIES:
-        logs = logs[-MAX_LOG_ENTRIES:]
+    logs['bot_logs'].append(details)
+
+    if len(logs['bot_logs']) > MAX_LOG_ENTRIES:
+        logs['bot_logs'] = logs['bot_logs'][-MAX_LOG_ENTRIES:]
 
     with open(LOG_FILE, 'w') as file:
         json.dump(logs, file, indent=4)
