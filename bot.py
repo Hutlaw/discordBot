@@ -180,11 +180,14 @@ class DiscordBot(discord.Client):
             logger.error(f'Error uploading to Twitter: {e}')
 
     def log_bot_run(self, details):
-        logs = {"bot_logs": []}
+        logs = {}
 
         if os.path.exists(LOG_FILE):
             with open(LOG_FILE, "r") as file:
                 logs = json.load(file)
+
+        if 'bot_logs' not in logs:
+            logs['bot_logs'] = []
 
         logs["bot_logs"].append(details)
 
