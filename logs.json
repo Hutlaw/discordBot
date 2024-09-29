@@ -1,17 +1,6 @@
 {
     "cleanup_logs": [
         {
-            "timestamp": "2024-09-24T01:02:10.222484",
-            "details": [
-                {
-                    "workflow": "cleanup-workflow-runs.yml",
-                    "deleted_success": 1,
-                    "deleted_failure": 0,
-                    "deleted_cancelled": 0
-                }
-            ]
-        },
-        {
             "timestamp": "2024-09-25T01:02:57.249263",
             "details": [
                 {
@@ -50,6 +39,17 @@
                 {
                     "workflow": "cleanup-workflow-runs.yml",
                     "deleted_success": 1,
+                    "deleted_failure": 0,
+                    "deleted_cancelled": 0
+                }
+            ]
+        },
+        {
+            "timestamp": "2024-09-29T01:06:57.143957",
+            "details": [
+                {
+                    "workflow": "cleanup-workflow-runs.yml",
+                    "deleted_success": 2,
                     "deleted_failure": 0,
                     "deleted_cancelled": 0
                 }
