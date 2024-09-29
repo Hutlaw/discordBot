@@ -76,7 +76,7 @@ class DiscordBot(discord.Client):
         if user is None:
             return
 
-        avatar_url = user.avatar.replace(size=1024, format='png') if user.avatar else user.default_avatar.url
+        avatar_url = user.avatar.replace(size=1024, format='png').url if user.avatar else user.default_avatar.url
         old_avatar_url = self.get_previous_avatar_url()
 
         if avatar_url == old_avatar_url:
