@@ -33,6 +33,7 @@ MAX_LOG_ENTRIES = 5
 
 intents = discord.Intents.default()
 intents.members = True
+intents.message_content = True
 
 class DiscordBot(discord.Client):
     def __init__(self, intents):
@@ -46,66 +47,70 @@ class DiscordBot(discord.Client):
             if guild is None:
                 return
 
-            user = guild.get_member(USER_ID)
-
-            if user is None:
-                return
-
             channel = guild.get_channel(CHANNEL_ID)
-
             if channel is None:
                 return
 
-            avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
+            last_message = await self.get_last_message_from_user(channel, USER_ID)
 
-            old_avatar_url = self.get_previous_avatar_url()
-
-            if avatar_url == old_avatar_url:
-                await channel.send(content='Profile picture has not changed yet. No updates.')
-            else:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(avatar_url) as response:
-                        if response.status == 200:
-                            file_path = 'pfp.png'
-                            image_data = await response.read()
-
-                            with open(file_path, 'wb') as f:
-                                f.write(image_data)
-
-                            self.save_current_avatar_url(avatar_url)
-
-                            await channel.send(content='Profile picture updated', file=discord.File(file_path))
-
-                            await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
-                            await self.upload_to_twitter(file_path)
-
-                            os.remove(file_path)
-
-            log_details = {
-                "timestamp": datetime.now().isoformat(),
-                "event": "Bot execution",
-                "success": True,
-                "details": {
-                    "guild": guild.name,
-                    "user": user.name,
-                    "channel": channel.name
-                }
-            }
-            self.log_bot_run(log_details)
+            if last_message and "stop" in last_message.content.lower():
+                await channel.send(content="Bot is currently stopped.")
+                return
+            elif last_message and any(keyword in last_message.content.lower() for keyword in ["go", "continue", "resume"]):
+                await self.execute_bot_logic(guild, channel)
 
         except Exception as e:
             await channel.send(content=f"An error occurred: {e}")
 
-            log_details = {
-                "timestamp": datetime.now().isoformat(),
-                "event": "Bot execution",
-                "success": False,
-                "error": str(e)
-            }
-            self.log_bot_run(log_details)
-
         finally:
             await self.close()
+
+    async def get_last_message_from_user(self, channel, user_id):
+        async for message in channel.history(limit=10):
+            if message.author.id == user_id:
+                return message
+        return None
+
+    async def execute_bot_logic(self, guild, channel):
+        user = guild.get_member(USER_ID)
+        if user is None:
+            return
+
+        avatar_url = user.avatar.replace(size=1024, format='png') if user.avatar else user.default_avatar.url
+        old_avatar_url = self.get_previous_avatar_url()
+
+        if avatar_url == old_avatar_url:
+            await channel.send(content='Profile picture has not changed yet. No updates.')
+        else:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(avatar_url) as response:
+                    if response.status == 200:
+                        file_path = 'pfp.png'
+                        image_data = await response.read()
+
+                        with open(file_path, 'wb') as f:
+                            f.write(image_data)
+
+                        self.save_current_avatar_url(avatar_url)
+
+                        await channel.send(content='Profile picture updated', file=discord.File(file_path))
+
+                        await self.upload_to_github(file_path, WEBSITE_FILE_PATH, repo_name=WEBSITE_REPO_NAME)
+                        await self.upload_to_twitter(file_path)
+
+                        os.remove(file_path)
+
+        log_details = {
+            "timestamp": datetime.now().isoformat(),
+            "event": "Bot execution",
+            "success": True,
+            "details": {
+                "guild": guild.name,
+                "user": user.name,
+                "channel": channel.name
+            }
+        }
+        self.log_bot_run(log_details)
 
     def get_previous_avatar_url(self):
         try:
